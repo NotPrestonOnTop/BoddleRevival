@@ -1,0 +1,8 @@
+.git
+node_modules
+data
+captures
+client
+certs
+*.har
+config.json

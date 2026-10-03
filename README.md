@@ -21,9 +21,21 @@ When Boddle ships a new version, capture again. New or changed endpoints show up
 Requires Node.js 20+ and no npm dependencies.
 
 ```bash
-npm start              # http://localhost:8080, admin at http://localhost:8080/admin
+npm start              # play at http://localhost:8080/play, admin at /admin
 npm test
 ```
+
+Or with Docker:
+
+```bash
+docker build -t boddle-revival .
+docker run -p 8080:8080 -v "$PWD/data:/app/data" -v "$PWD/captures:/app/captures" boddle-revival
+```
+
+`/play` is this project's own browser game: sign up, battle monsters by answering
+math questions across 3 worlds, earn coins and XP, buy and wear items, and climb the
+leaderboard. It runs on the native API below and works right away, before any
+captures. The real Boddle client connects through the capture workflow.
 
 Optional: copy `config.example.json` to `config.json` to change ports, enable HTTPS, etc.
 
@@ -52,7 +64,8 @@ Request handling order: **custom handlers** (`src/routes/custom/`) → **native 
 | `src/routes/custom/` | Your handlers for the real client's endpoints (see `_example.js`) |
 | `src/game/questions.js` | Original K–8 math question generator (11 skills) |
 | `src/game/economy.js` | Coins, XP, levels, streaks, shop catalog |
-| `src/captures.js`, `src/har.js` | Capture import, secret scrubbing, path normalization, replay matching |
+| `src/captures.js`, `src/har.js` | Capture import (HTTP + WebSocket frames), secret scrubbing, path normalization, replay matching |
+| `public/play.html` | Built-in browser game for the native API (`/play`) |
 | `src/admin.js` | `/admin` dashboard: players, recorded endpoints, unhandled requests, coin grants |
 | `tools/` | `import-har`, `analyze`, `scaffold` CLIs |
 

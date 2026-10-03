@@ -22,6 +22,10 @@ tokens, cookies and emails, but open the file and check it anyway before sharing
    every host, then narrow it. Images, scripts and other assets are skipped unless you
    pass `--include-assets`.
 
+WebSocket traffic (live multiplayer, battles) is included automatically when Chrome
+exports the HAR. `npm run analyze` lists each socket and the message types sent and
+received.
+
 ## Mobile or desktop apps
 
 Use an intercepting proxy such as [mitmproxy](https://mitmproxy.org/) and export HAR:

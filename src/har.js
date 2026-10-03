@@ -18,15 +18,21 @@ export function harToCaptures(har, { hostFilter = null, includeAssets = false } 
     } catch {
       continue;
     }
-    if (!/^https?:$/.test(url.protocol)) continue;
+    if (!/^(https?|wss?):$/.test(url.protocol)) continue;
     if (hostFilter && !hostFilter.test(url.hostname)) continue;
+
+    const reqHeadersRaw = headerMap(e.request.headers);
+    if (e._webSocketMessages || reqHeadersRaw.upgrade?.toLowerCase() === 'websocket') {
+      out.push(websocketCapture(e, url, reqHeadersRaw));
+      continue;
+    }
 
     const resHeaders = headerMap(e.response?.headers);
     const mime = e.response?.content?.mimeType || resHeaders['content-type'] || '';
     if (!includeAssets && (ASSET_EXT.test(url.pathname) || ASSET_MIME.test(mime))) continue;
     if (!e.response || e.response.status === 0) continue; // blocked or aborted
 
-    const reqHeaders = headerMap(e.request.headers);
+    const reqHeaders = reqHeadersRaw;
     const content = e.response.content ?? {};
     const isBase64 = content.encoding === 'base64';
     out.push({
@@ -48,4 +54,62 @@ export function harToCaptures(har, { hostFilter = null, includeAssets = false } 
     });
   }
   return out;
+}
+
+/**
+ * Chrome stores a WebSocket's frames in the non-standard `_webSocketMessages`
+ * field of its HAR entry. They're kept for analysis; replay doesn't use them.
+ */
+function websocketCapture(e, url, reqHeaders) {
+  return {
+    recordedAt: e.startedDateTime,
+    host: url.hostname.toLowerCase(),
+    method: 'GET',
+    path: url.pathname,
+    query: url.search,
+    request: { headers: scrubHeaders(reqHeaders), body: '' },
+    response: { status: e.response?.status ?? 101, headers: {}, body: '', bodyEncoding: 'utf8' },
+    websocket: {
+      messages: (e._webSocketMessages ?? []).map((m) => ({
+        direction: m.type === 'send' ? 'send' : 'receive',
+        time: m.time,
+        opcode: m.opcode,
+        data: m.opcode === 2 ? m.data : scrubFrame(m.data),
+      })),
+    },
+  };
+}
+
+/** Scrubs a text frame, keeping any Socket.IO/engine.io numeric prefix intact. */
+function scrubFrame(data) {
+  if (typeof data !== 'string') return data;
+  const m = /^(\d+(?:\/[^,]*,)?\d*)([[{].*)$/s.exec(data);
+  return m ? m[1] + scrubBody(m[2], 'json') : scrubBody(data, '');
+}
+
+/**
+ * Names a WebSocket message for analysis: Socket.IO event name, JSON "type"/
+ * "event"/"action"/"cmd" field, or a generic shape.
+ */
+export function messageKind(data, opcode = 1) {
+  if (opcode === 2) return 'binary';
+  if (typeof data !== 'string' || !data) return 'empty';
+  const sio = /^(\d+)(?:\/[^,]*,)?(\d*)(\[.*)$/s.exec(data);
+  if (sio) {
+    try {
+      const arr = JSON.parse(sio[3]);
+      if (Array.isArray(arr) && typeof arr[0] === 'string') return `socket.io "${arr[0]}"`;
+    } catch { /* fall through */ }
+  }
+  if (/^\d+$/.test(data)) return `engine.io packet ${data}`;
+  try {
+    const v = JSON.parse(data.replace(/^\d+/, '') || 'null');
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const k of ['type', 'event', 'action', 'cmd', 'op', 'method']) {
+        if (typeof v[k] === 'string' || typeof v[k] === 'number') return `${k}=${v[k]}`;
+      }
+      return `{${Object.keys(v).slice(0, 6).join(', ')}}`;
+    }
+  } catch { /* not JSON */ }
+  return 'text';
 }

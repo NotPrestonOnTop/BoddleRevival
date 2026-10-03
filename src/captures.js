@@ -83,6 +83,7 @@ export class CaptureIndex {
   }
 
   add(entry) {
+    if (entry.websocket) return; // analysed by tools/analyze.js, never replayed over HTTP
     const key = `${entry.method.toUpperCase()} ${normalizePath(entry.path)}`.toLowerCase();
     if (!this.byKey.has(key)) this.byKey.set(key, []);
     this.byKey.get(key).push(entry);

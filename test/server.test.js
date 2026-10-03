@@ -111,3 +111,14 @@ test('data persists across restarts', async () => {
   assert.equal(login.status, 200);
   await again.close();
 });
+
+test('serves the built-in play page', async (t) => {
+  const { app, base } = await boot();
+  t.after(() => app.close());
+  const root = await fetch(base + '/', { redirect: 'manual' });
+  assert.equal(root.status, 302);
+  assert.equal(root.headers.get('location'), '/play');
+  const play = await fetch(base + '/play');
+  assert.equal(play.status, 200);
+  assert.match(await play.text(), /<title>Boddle Revival<\/title>/);
+});

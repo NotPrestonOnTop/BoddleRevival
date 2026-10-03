@@ -4,6 +4,7 @@
 import { parseArgs } from 'node:util';
 import { loadCaptureFiles, normalizePath } from '../src/captures.js';
 import { loadConfig } from '../src/config.js';
+import { messageKind } from '../src/har.js';
 
 const { values } = parseArgs({ options: { json: { type: 'boolean', default: false } } });
 const config = loadConfig();
@@ -24,8 +25,20 @@ function shape(body) {
   }
 }
 
+const sockets = new Map();
+for (const e of entries.filter((x) => x.websocket)) {
+  const key = `${e.host}${normalizePath(e.path)}`;
+  const s = sockets.get(key) ?? { url: `wss://${key}`, connections: 0, kinds: new Map() };
+  s.connections++;
+  for (const m of e.websocket.messages) {
+    const kind = `${m.direction === 'send' ? '→' : '←'} ${messageKind(m.data, m.opcode)}`;
+    s.kinds.set(kind, (s.kinds.get(kind) ?? 0) + 1);
+  }
+  sockets.set(key, s);
+}
+
 const endpoints = new Map();
-for (const e of entries) {
+for (const e of entries.filter((x) => !x.websocket)) {
   const key = `${e.host} ${e.method} ${normalizePath(e.path)}`;
   const ep = endpoints.get(key) ?? { host: e.host, method: e.method, path: normalizePath(e.path), count: 0, statuses: new Set(), request: '', response: '' };
   ep.count++;
@@ -36,12 +49,16 @@ for (const e of entries) {
 }
 
 const list = [...endpoints.values()].sort((a, b) => (a.host + a.path).localeCompare(b.host + b.path));
+const socketList = [...sockets.values()].map((s) => ({ ...s, kinds: Object.fromEntries(s.kinds) }));
 if (values.json) {
-  console.log(JSON.stringify(list.map((e) => ({ ...e, statuses: [...e.statuses] })), null, 2));
+  console.log(JSON.stringify({
+    endpoints: list.map((e) => ({ ...e, statuses: [...e.statuses] })),
+    websockets: socketList,
+  }, null, 2));
   process.exit(0);
 }
 
-const hosts = [...new Set(list.map((e) => e.host))];
+const hosts = [...new Set([...list.map((e) => e.host), ...entries.filter((x) => x.websocket).map((x) => x.host)])];
 console.log(`${entries.length} recorded calls, ${list.length} distinct endpoints\n`);
 console.log('Hosts the client talks to (redirect these to your server):');
 for (const h of hosts) console.log(`  ${h}`);
@@ -51,5 +68,13 @@ for (const h of hosts) {
     console.log(`  ${e.method.padEnd(6)} ${e.path}  [${[...e.statuses].join(',')}] x${e.count}`);
     if (e.request) console.log(`         req: ${e.request}`);
     console.log(`         res: ${e.response}`);
+  }
+}
+
+if (socketList.length) {
+  console.log('\n== WebSockets (realtime; not replayed yet: see docs/ROADMAP.md)');
+  for (const s of socketList) {
+    console.log(`  ${s.url}  x${s.connections} connection(s)`);
+    for (const [kind, n] of Object.entries(s.kinds).sort((a, b) => b[1] - a[1])) console.log(`         ${kind}  x${n}`);
   }
 }

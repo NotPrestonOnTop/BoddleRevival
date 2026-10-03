@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boddle Revival</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🧮%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #eef3ff; --panel: #ffffff; --ink: #1d2340; --muted: #6a7192; --line: #dde3f5;
+    --accent: #5b6cff; --accent-ink: #ffffff; --good: #1fa971; --bad: #e0475b; --gold: #f2b300;
+    --body: #8aa4ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121528; --panel: #1c2040; --ink: #eef0ff; --muted: #9aa0c4; --line: #2c3160;
+      --accent: #7d8bff; --accent-ink: #0e1022;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  header h1 { font-size: 20px; margin: 0; flex: 1; }
+  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-weight: 600; white-space: nowrap; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  button { font: inherit; cursor: pointer; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 8px 14px; }
+  button.primary, nav button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: center; }
+  .card .icon { font-size: 34px; }
+  .muted { color: var(--muted); }
+  .error { color: var(--bad); min-height: 1.4em; }
+  .avatar { position: relative; width: 120px; height: 120px; margin: 0 auto; }
+  .avatar .body { position: absolute; inset: 24px 14px 0; border-radius: 50% 50% 42% 42%; background: var(--body); box-shadow: inset -8px -10px 0 rgba(0,0,0,.12); }
+  .avatar .eyes { position: absolute; top: 56px; left: 0; right: 0; text-align: center; font-size: 18px; letter-spacing: 10px; }
+  .avatar .hat { position: absolute; top: -6px; left: 0; right: 0; text-align: center; font-size: 40px; }
+  .avatar .outfit { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 30px; }
+  .avatar .pet { position: absolute; bottom: 0; right: -30px; font-size: 32px; }
+  .bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); transition: width .3s; }
+  .arena { display: flex; justify-content: space-around; align-items: end; gap: 12px; min-height: 150px; }
+  .fighter { text-align: center; }
+  .monster { font-size: 72px; transition: transform .15s; }
+  .hit { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  .hearts { letter-spacing: 2px; min-height: 1.4em; }
+  .prompt { font-size: 28px; font-weight: 700; text-align: center; margin: 16px 0; word-break: break-word; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choices button { font-size: 22px; padding: 14px; font-weight: 600; }
+  .choices button.right { background: var(--good); color: #fff; border-color: var(--good); }
+  .choices button.wrong { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .stars { color: var(--gold); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🧮 Boddle Revival</h1>
+    <span class="pill" id="coins" hidden></span>
+    <span class="pill" id="level" hidden></span>
+    <button id="logout" hidden>Log out</button>
+  </header>
+
+  <!-- Sign in -->
+  <section id="auth" class="panel" hidden>
+    <h2 style="margin-top:0">Welcome!</h2>
+    <p class="muted">Make an account on this private server. Don't use your real Boddle password.</p>
+    <form id="authForm">
+      <label for="username">Username</label>
+      <input id="username" autocomplete="username" required minlength="3" maxlength="24">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required minlength="6">
+      <div id="registerFields" hidden>
+        <label for="grade">Grade</label>
+        <select id="grade"></select>
+      </div>
+      <p class="error" id="authError"></p>
+      <div class="row">
+        <button class="primary" type="submit" id="authSubmit">Log in</button>
+        <button type="button" id="authToggle">New here? Sign up</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Game -->
+  <section id="game" hidden>
+    <nav>
+      <button data-tab="worlds" class="active">🗺️ Worlds</button>
+      <button data-tab="shop">🛒 Shop</button>
+      <button data-tab="wardrobe">👕 Wardrobe</button>
+      <button data-tab="leaders">🏆 Leaders</button>
+      <button data-tab="profile">⚙️ Profile</button>
+    </nav>
+
+    <div data-view="worlds">
+      <div class="panel">
+        <div class="avatar" id="avatarMain"></div>
+        <p style="text-align:center;margin:12px 0 4px" id="hello"></p>
+        <div class="bar"><div id="xpBar"></div></div>
+        <p class="muted" style="text-align:center;font-size:13px;margin:4px 0 0" id="xpText"></p>
+      </div>
+      <div id="worldList"></div>
+    </div>
+
+    <div data-view="battle" hidden>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between">
+          <strong id="battleTitle"></strong>
+          <button id="flee">Leave</button>
+        </div>
+        <div class="arena">
+          <div class="fighter"><div class="avatar" id="avatarBattle"></div><div class="hearts" id="playerHearts"></div></div>
+          <div class="fighter"><div class="monster" id="monster"></div><div class="hearts" id="monsterHearts"></div></div>
+        </div>
+        <div class="prompt" id="prompt"></div>
+        <div class="choices" id="choices"></div>
+        <p class="muted" style="text-align:center;min-height:1.4em" id="feedback"></p>
+      </div>
+    </div>
+
+    <div data-view="shop" hidden><div class="panel"><div class="grid" id="shop"></div></div></div>
+    <div data-view="wardrobe" hidden><div class="panel"><div class="grid" id="wardrobe"></div></div></div>
+    <div data-view="leaders" hidden><div class="panel"><table id="leaders"></table></div></div>
+    <div data-view="profile" hidden>
+      <div class="panel">
+        <label for="displayName">Display name</label>
+        <input id="displayName" maxlength="32">
+        <label for="profileGrade">Grade (sets question difficulty)</label>
+        <select id="profileGrade"></select>
+        <p class="muted" id="statsText"></p>
+        <button class="primary" id="saveProfile">Save</button>
+        <p class="muted" id="profileMsg"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const GRADES = ['Kindergarten', ...Array.from({ length: 8 }, (_, i) => `Grade ${i + 1}`)];
+const WORLDS = [
+  { id: 'w1', name: 'Number Meadow', monsters: ['🐛', '🐌', '🐸', '🦔', '🐻'] },
+  { id: 'w2', name: 'Fraction Forest', monsters: ['🦊', '🦇', '🐺', '🦉', '🐗'] },
+  { id: 'w3', name: 'Algebra Volcano', monsters: ['🦎', '🐊', '🦂', '🐲', '👾'] },
+];
+const PLAYER_HP = 3;
+
+let token = null;
+try { token = localStorage.getItem('br-token'); } catch {}
+let me = null;
+let catalog = [];
+let battle = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(method, path, body) {
+  const res = await fetch('/api/v1' + path, {
+    method,
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== '/auth/login') { setToken(null); show(); }
+  if (!res.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+}
+
+function setToken(t) {
+  token = t;
+  try { t ? localStorage.setItem('br-token', t) : localStorage.removeItem('br-token'); } catch {}
+}
+
+function fillGrades(select) {
+  select.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g}</option>`).join('');
+  select.value = '2';
+}
+fillGrades($('grade'));
+fillGrades($('profileGrade'));
+
+// ---------- auth ----------
+let registering = false;
+$('authToggle').onclick = () => {
+  registering = !registering;
+  $('registerFields').hidden = !registering;
+  $('authSubmit').textContent = registering ? 'Sign up' : 'Log in';
+  $('authToggle').textContent = registering ? 'Have an account? Log in' : 'New here? Sign up';
+  $('password').autocomplete = registering ? 'new-password' : 'current-password';
+};
+$('authForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('authError').textContent = '';
+  try {
+    const body = { username: $('username').value.trim(), password: $('password').value };
+    if (registering) body.grade = Number($('grade').value);
+    const data = await api('POST', registering ? '/auth/register' : '/auth/login', body);
+    setToken(data.token);
+    me = data.player;
+    show();
+  } catch (err) {
+    $('authError').textContent = err.message;
+  }
+};
+$('logout').onclick = async () => {
+  try { await api('POST', '/auth/logout'); } catch {}
+  setToken(null);
+  me = null;
+  show();
+};
+
+// ---------- rendering ----------
+const item = (id) => catalog.find((c) => c.id === id);
+
+function renderAvatar(el, player) {
+  const a = player.avatar || {};
+  const color = item(a.color)?.color;
+  el.innerHTML =
+    `<div class="body" style="${color ? `background:${color}` : ''}"></div>` +
+    `<div class="eyes">● ●</div>` +
+    (a.hat ? `<div class="hat">${item(a.hat)?.icon ?? ''}</div>` : '') +
+    (a.outfit ? `<div class="outfit">${item(a.outfit)?.icon ?? ''}</div>` : '') +
+    (a.pet ? `<div class="pet">${item(a.pet)?.icon ?? ''}</div>` : '');
+}
+
+function renderHeader() {
+  $('coins').textContent = `🪙 ${me.coins}`;
+  $('level').textContent = `⭐ Lv ${me.level}`;
+  const lo = 50 * me.level * (me.level - 1);
+  const hi = 50 * (me.level + 1) * me.level;
+  $('xpBar').style.width = `${Math.round(((me.xp - lo) / (hi - lo)) * 100)}%`;
+  $('xpText').textContent = `${me.xp - lo} / ${hi - lo} XP to level ${me.level + 1}`;
+  $('hello').textContent = `Hi, ${me.displayName}!`;
+  renderAvatar($('avatarMain'), me);
+}
+
+function renderWorlds() {
+  const progress = me.progress || {};
+  let unlocked = true;
+  $('worldList').innerHTML = WORLDS.map((w) => {
+    const levels = w.monsters.map((m, i) => {
+      const id = `${w.id}-${i + 1}`;
+      const p = progress[id];
+      const open = unlocked;
+      unlocked = !!p;
+      return `<button ${open ? '' : 'disabled'} data-level="${id}">
+        <div style="font-size:28px">${open ? m : '🔒'}</div>
+        <div>${w.name.split(' ')[0]} ${i + 1}</div>
+        <div class="stars">${'★'.repeat(p?.stars ?? 0)}${'☆'.repeat(3 - (p?.stars ?? 0))}</div>
+      </button>`;
+    }).join('');
+    return `<div class="panel"><h3 style="margin-top:0">${esc(w.name)}</h3><div class="levels">${levels}</div></div>`;
+  }).join('');
+  $('worldList').querySelectorAll('[data-level]').forEach((b) => (b.onclick = () => startBattle(b.dataset.level)));
+}
+
+function renderShop() {
+  $('shop').innerHTML = catalog.map((c) => {
+    const owned = me.inventory.includes(c.id);
+    return `<div class="card"><div class="icon">${c.icon}</div><div>${esc(c.name)}</div>
+      <div class="muted">${esc(c.slot)}</div>
+      <button ${owned || me.coins < c.price ? 'disabled' : ''} data-buy="${c.id}">${owned ? 'Owned' : `🪙 ${c.price}`}</button></div>`;
+  }).join('');
+  $('shop').querySelectorAll('[data-buy]').forEach((b) => (b.onclick = async () => {
+    try {
+      me = (await api('POST', '/shop/buy', { itemId: b.dataset.buy })).player;
+      refresh();
+    } catch (err) { alert(err.message); }
+  }));
+}
+
+function renderWardrobe() {
+  const owned = catalog.filter((c) => me.inventory.includes(c.id) && c.slot !== 'emote');
+  if (!owned.length) {
+    $('wardrobe').innerHTML = '<p class="muted">Nothing here yet. Win battles to earn coins, then visit the shop!</p>';
+    return;
+  }
+  $('wardrobe').innerHTML = owned.map((c) => {
+    const on = me.avatar?.[c.slot] === c.id;
+    return `<div class="card"><div class="icon">${c.icon}</div><div>${esc(c.name)}</div>
+      <button class="${on ? 'primary' : ''}" data-wear="${c.id}">${on ? 'Wearing' : 'Wear'}</button></div>`;
+  }).join('');
+  $('wardrobe').querySelectorAll('[data-wear]').forEach((b) => (b.onclick = async () => {
+    const c = item(b.dataset.wear);
+    const avatar = { ...(me.avatar || {}) };
+    avatar[c.slot] = avatar[c.slot] === c.id ? null : c.id;
+    try {
+      me = await api('PUT', '/me/avatar', avatar);
+      refresh();
+    } catch (err) { alert(err.message); }
+  }));
+}
+
+async function renderLeaders() {
+  const rows = await api('GET', '/leaderboard');
+  $('leaders').innerHTML = '<tr><th>#</th><th>Player</th><th>Level</th><th>XP</th></tr>' +
+    rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.displayName)}</td><td>${r.level}</td><td>${r.xp}</td></tr>`).join('');
+}
+
+function renderProfile() {
+  $('displayName').value = me.displayName;
+  $('profileGrade').value = String(me.grade);
+  const { answered, correct } = me.stats;
+  $('statsText').textContent = `${answered} questions answered, ${answered ? Math.round((correct / answered) * 100) : 0}% correct.`;
+}
+$('saveProfile').onclick = async () => {
+  try {
+    me = await api('PATCH', '/me', { displayName: $('displayName').value, grade: Number($('profileGrade').value) });
+    $('profileMsg').textContent = 'Saved!';
+    refresh();
+  } catch (err) { $('profileMsg').textContent = err.message; }
+};
+
+let tab = 'worlds';
+document.querySelectorAll('nav [data-tab]').forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+function setTab(name) {
+  tab = name;
+  battle = null;
+  document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== name));
+  refresh();
+}
+
+function refresh() {
+  if (!me) return;
+  renderHeader();
+  if (tab === 'worlds') renderWorlds();
+  if (tab === 'shop') renderShop();
+  if (tab === 'wardrobe') renderWardrobe();
+  if (tab === 'leaders') renderLeaders().catch(() => {});
+  if (tab === 'profile') renderProfile();
+}
+
+// ---------- battle ----------
+async function startBattle(levelId) {
+  const [worldId, n] = levelId.split('-');
+  const world = WORLDS.find((w) => w.id === worldId);
+  const index = Number(n) - 1;
+  battle = { levelId, monster: world.monsters[index], hp: 3 + index, maxHp: 3 + index, playerHp: PLAYER_HP, hits: 0 };
+  document.querySelectorAll('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== 'battle'));
+  $('battleTitle').textContent = `${world.name} · Level ${n}`;
+  $('monster').textContent = battle.monster;
+  renderAvatar($('avatarBattle'), me);
+  drawHearts();
+  nextQuestion();
+}
+$('flee').onclick = () => setTab('worlds');
+
+function drawHearts() {
+  $('playerHearts').textContent = '❤️'.repeat(battle.playerHp) + '🤍'.repeat(PLAYER_HP - battle.playerHp);
+  $('monsterHearts').textContent = '💜'.repeat(battle.hp) + '🤍'.repeat(battle.maxHp - battle.hp);
+}
+
+async function nextQuestion() {
+  if (!battle) return;
+  $('feedback').textContent = '';
+  try {
+    const q = await api('GET', '/questions/next');
+    battle.question = q;
+    $('prompt').textContent = q.prompt;
+    $('choices').innerHTML = q.choices.map((c, i) => `<button data-i="${i}">${esc(c)}</button>`).join('');
+    $('choices').querySelectorAll('button').forEach((b) => (b.onclick = () => answer(Number(b.dataset.i), b)));
+  } catch (err) {
+    $('feedback').textContent = err.message;
+  }
+}
+
+async function answer(choiceIndex, button) {
+  const current = battle;
+  if (!current) return;
+  $('choices').querySelectorAll('button').forEach((b) => (b.disabled = true));
+  const result = await api('POST', `/questions/${current.question.id}/answer`, { choiceIndex });
+  me = result.player;
+  renderHeader();
+  $('choices').querySelectorAll('button').forEach((b) => {
+    if (b.textContent === result.correctAnswer) b.classList.add('right');
+  });
+  if (result.correct) {
+    current.hp--;
+    $('monster').classList.remove('hit'); void $('monster').offsetWidth; $('monster').classList.add('hit');
+    $('feedback').textContent = `Nice! +${result.earned.coins} coins${result.earned.leveledUp ? ' · LEVEL UP! 🎉' : ''}`;
+  } else {
+    button.classList.add('wrong');
+    current.playerHp--;
+    current.hits++;
+    $('feedback').textContent = `The answer was ${result.correctAnswer}.`;
+  }
+  drawHearts();
+  setTimeout(() => finishTurn(current), 1100);
+}
+
+async function finishTurn(current) {
+  if (battle !== current) return;
+  if (current.hp <= 0) {
+    const stars = current.hits === 0 ? 3 : current.hits === 1 ? 2 : 1;
+    await api('POST', `/progress/${current.levelId}`, { stars });
+    me = await api('GET', '/me');
+    $('prompt').textContent = `You won! ${'★'.repeat(stars)}`;
+    $('choices').innerHTML = '<button class="primary" id="again">Back to map</button>';
+    $('again').onclick = () => setTab('worlds');
+    $('feedback').textContent = '';
+    battle = null;
+  } else if (current.playerHp <= 0) {
+    $('prompt').textContent = 'Oh no! Try again?';
+    $('choices').innerHTML = `<button class="primary" id="retry">Retry</button><button id="back">Back to map</button>`;
+    $('retry').onclick = () => startBattle(current.levelId);
+    $('back').onclick = () => setTab('worlds');
+    battle = null;
+  } else {
+    nextQuestion();
+  }
+}
+
+// ---------- boot ----------
+async function show() {
+  const signedIn = !!token;
+  $('auth').hidden = signedIn;
+  $('game').hidden = !signedIn;
+  ['coins', 'level', 'logout'].forEach((id) => ($(id).hidden = !signedIn));
+  if (!signedIn) return;
+  try {
+    [me, catalog] = await Promise.all([api('GET', '/me'), api('GET', '/shop')]);
+    setTab('worlds');
+  } catch {}
+}
+show();
+</script>
+</body>
+</html>

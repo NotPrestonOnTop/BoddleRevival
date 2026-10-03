@@ -6,6 +6,9 @@
 - [x] Native backend: accounts (scrypt), sessions, K–8 question generator, coins/XP/levels/streaks, shop, avatar, progress, leaderboard
 - [x] Admin dashboard: unhandled requests, players, coin grants, recorded endpoints, routes
 - [x] Host tunnelling (`/_host/<host>/…`) for browser redirect rules
+- [x] Built-in browser game at `/play` (worlds, battles, shop, wardrobe, leaderboard)
+- [x] WebSocket frame capture + message-type analysis (Socket.IO aware)
+- [x] CI (Node 20 + 22) and Dockerfile
 
 ## Next: needs your captures
 - [ ] Capture a full session of the current client (docs/CAPTURING.md)
@@ -14,10 +17,9 @@
 - [ ] Map question/battle endpoints onto the question generator and `applyAnswer`
 - [ ] Map shop and avatar endpoints
 - [ ] Map level/world progress endpoints
-- [ ] Handle any realtime channel (WebSocket/Socket.IO) if the analysis shows one
+- [ ] Serve the realtime channel (WebSocket/Socket.IO) if the analysis shows the client needs one
 
 ## Later
 - [ ] Teacher/class features (assign skills, view class progress)
 - [ ] Multiplayer
 - [ ] SQLite storage if the player count grows
-- [ ] Docker image for easy hosting

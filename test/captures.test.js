@@ -49,3 +49,24 @@ test('harToCaptures keeps API calls, skips assets, scrubs bodies', () => {
   assert.deepEqual(JSON.parse(c.response.body), { token: '[redacted]', coins: 5 });
   assert.equal(c.response.headers['set-cookie'], '[redacted]');
 });
+
+test('WebSocket frames are captured for analysis but not replayed', async () => {
+  const { messageKind } = await import('../src/har.js');
+  const har = { log: { entries: [{
+    request: { method: 'GET', url: 'wss://rt.game.test/socket.io/?EIO=4&transport=websocket', headers: [{ name: 'Upgrade', value: 'websocket' }] },
+    response: { status: 101, headers: [] },
+    _webSocketMessages: [
+      { type: 'send', time: 1, opcode: 1, data: '42["joinRoom",{"room":"abc","token":"t"}]' },
+      { type: 'receive', time: 2, opcode: 1, data: '{"type":"state","hp":3}' },
+    ],
+  }] } };
+  const [ws] = harToCaptures(har);
+  assert.equal(ws.websocket.messages.length, 2);
+  assert.equal(ws.websocket.messages[0].data, '42["joinRoom",{"room":"abc","token":"[redacted]"}]');
+  assert.equal(ws.websocket.messages[1].direction, 'receive');
+  assert.equal(new CaptureIndex([ws]).size, 0);
+  assert.equal(messageKind(ws.websocket.messages[0].data), 'socket.io "joinRoom"');
+  assert.equal(messageKind('{"type":"state","hp":3}'), 'type=state');
+  assert.equal(messageKind('3'), 'engine.io packet 3');
+  assert.equal(messageKind('', 2), 'binary');
+});

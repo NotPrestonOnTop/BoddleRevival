@@ -33,6 +33,13 @@ export async function createApp(config, { customDir = path.join(ROOT, 'src/route
   const customCount = await loadCustomRoutes(router, customDir);
   registerAdminRoutes(router, state);
   registerApiRoutes(router, state);
+  // Our own browser client for the native API.
+  const playPage = path.join(ROOT, 'public/play.html');
+  router.add('GET', '/play', () => ({
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    body: fs.readFileSync(playPage),
+  }));
+  if (!config.staticDir) router.add('GET', '/', () => ({ status: 302, headers: { location: '/play' } }));
 
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
