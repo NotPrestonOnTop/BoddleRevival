@@ -55,3 +55,23 @@ test('rewards, streaks and levels', () => {
   assert.equal(p.streak, 0);
   assert.deepEqual(p.stats, { answered: 3, correct: 2 });
 });
+
+test('decimal and rounding questions have tidy choices', () => {
+  for (let i = 0; i < 200; i++) {
+    const d = generateQuestion({ skill: 'decimal-addition', grade: 5 });
+    const [a, b] = d.prompt.match(/\d+\.\d/g).map(Number);
+    assert.equal(d.answer, (a + b).toFixed(1));
+    for (const c of d.choices) assert.match(c, /^\d+\.\d$/);
+
+    const r = generateQuestion({ skill: 'rounding', grade: 3 });
+    const step = Number(r.prompt.match(/nearest (\d+)/)[1]);
+    for (const c of r.choices) assert.equal(Number(c) % step, 0, r.prompt + ' ' + r.choices);
+  }
+});
+
+test('answers that are never negative get no negative choices', () => {
+  for (let i = 0; i < 300; i++) {
+    const q = generateQuestion({ skill: 'counting', grade: 0 });
+    for (const c of q.choices) assert.ok(Number(c) >= 0, q.choices.join());
+  }
+});

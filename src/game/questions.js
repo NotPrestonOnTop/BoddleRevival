@@ -77,6 +77,32 @@ export const SKILLS = {
       return { prompt: `Simplify ${n * k}/${d * k}`, answer: `${n / g}/${d / g}` };
     },
   },
+  rounding: {
+    grades: [3, 4],
+    make(rng) {
+      const n = int(rng, 101, 9999);
+      const step = rng() < 0.5 ? 10 : 100;
+      return { prompt: `Round ${n} to the nearest ${step}.`, answer: Math.round(n / step) * step, step };
+    },
+  },
+  'area-perimeter': {
+    grades: [3, 4, 5],
+    make(rng) {
+      const w = int(rng, 2, 12);
+      const h = int(rng, 2, 12);
+      return rng() < 0.5
+        ? { prompt: `A rectangle is ${w} by ${h}. What is its area?`, answer: w * h }
+        : { prompt: `A rectangle is ${w} by ${h}. What is its perimeter?`, answer: 2 * (w + h) };
+    },
+  },
+  'decimal-addition': {
+    grades: [4, 5, 6],
+    make(rng) {
+      const a = int(rng, 1, 99);
+      const b = int(rng, 1, 99);
+      return { prompt: `${(a / 10).toFixed(1)} + ${(b / 10).toFixed(1)} = ?`, answer: (a + b) / 10, step: 0.1 };
+    },
+  },
   'order-of-operations': {
     grades: [5, 6, 7, 8],
     make(rng) {
@@ -109,13 +135,23 @@ export function skillsForGrade(grade) {
   return Object.keys(SKILLS).filter((s) => SKILLS[s].grades.includes(grade));
 }
 
-function makeChoices(rng, answer) {
-  const choices = new Set([String(answer)]);
+const decimalsOf = (step) => (String(step).split('.')[1] ?? '').length;
+
+/** Formats a numeric answer with as many decimals as its step has. */
+const formatNumber = (n, step = 1) => (decimalsOf(step) ? n.toFixed(decimalsOf(step)) : String(n));
+
+function makeChoices(rng, answer, step = 1) {
+  const choices = new Set([typeof answer === 'number' ? formatNumber(answer, step) : answer]);
   if (typeof answer === 'number') {
-    let spread = Math.max(3, Math.ceil(Math.abs(answer) * 0.2));
+    // Work in whole units of `step` so decimals and rounded answers stay tidy.
+    const scale = 10 ** decimalsOf(step);
+    const base = Math.round(answer * scale);
+    const unit = Math.round(step * scale);
+    let spread = Math.max(3, Math.ceil(Math.abs(answer / step) * 0.2));
     while (choices.size < 4) {
       const offset = int(rng, -spread, spread);
-      if (offset !== 0) choices.add(String(answer + offset));
+      const value = (base + offset * unit) / scale;
+      if (offset !== 0 && !(answer >= 0 && value < 0)) choices.add(formatNumber(value, step));
       spread++;
     }
   } else {
@@ -141,14 +177,14 @@ export function generateQuestion({ grade = 2, skill = null, rng = Math.random } 
   const chosen = pool[int(rng, 0, pool.length - 1)];
   const def = SKILLS[chosen];
   if (!def) throw new Error(`Unknown skill: ${skill}`);
-  const { prompt, answer } = def.make(rng, g);
+  const { prompt, answer, step = 1 } = def.make(rng, g);
   return {
     id: crypto.randomUUID(),
     skill: chosen,
     grade: g,
     prompt,
-    choices: makeChoices(rng, answer),
-    answer: String(answer),
+    choices: makeChoices(rng, answer, step),
+    answer: typeof answer === 'number' ? formatNumber(answer, step) : answer,
   };
 }
 
