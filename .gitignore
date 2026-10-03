@@ -1,0 +1,9 @@
+node_modules/
+# Runtime state and personal captures: these can contain account data. Never commit them.
+data/
+captures/
+*.har
+certs/
+# Locally saved game client files are Boddle's property; keep them out of the repo.
+client/
+config.json

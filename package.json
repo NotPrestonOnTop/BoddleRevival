@@ -1,0 +1,16 @@
+{
+  "name": "boddle-revival",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted private server for the Boddle client: capture-driven replay plus a native game backend.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "import-har": "node tools/import-har.js",
+    "analyze": "node tools/analyze.js",
+    "scaffold": "node tools/scaffold.js"
+  }
+}
