@@ -13,6 +13,36 @@ export function publicPlayer(p) {
   return rest;
 }
 
+/** Creates a player account. Throws HttpError on a bad or taken username. */
+export function createPlayer(store, config, { username, password, displayName, grade = 2 }) {
+  const players = store.collection('players');
+  if (!USERNAME.test(username ?? '')) throw new HttpError(400, 'Username must be 3-24 letters, numbers, . _ or -');
+  if (typeof password !== 'string' || !password) throw new HttpError(400, 'Password required');
+  const lower = username.toLowerCase();
+  if (players.find((p) => p.username === lower)) throw new HttpError(409, 'Username taken');
+  return players.insert({
+    username: lower,
+    displayName: String(displayName || username).slice(0, 32),
+    passwordHash: hashPassword(password),
+    grade: Math.max(0, Math.min(8, Number(grade) || 0)),
+    coins: config.startingCoins,
+    xp: 0,
+    level: 1,
+    streak: 0,
+    stats: { answered: 0, correct: 0 },
+    inventory: [],
+    avatar: {},
+    progress: {},
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** Looks up a player by username and password, or returns null. */
+export function findPlayerByLogin(store, username, password) {
+  const player = store.collection('players').find((p) => p.username === String(username ?? '').toLowerCase());
+  return player && verifyPassword(String(password ?? ''), player.passwordHash) ? player : null;
+}
+
 /**
  * The server's own game API. These paths are ours, not Boddle's: map the real
  * client's endpoints onto this logic from handlers in src/routes/custom/.
@@ -27,34 +57,14 @@ export function registerApiRoutes(router, { store, config }) {
 
   add('POST', '/auth/register', ({ json }) => {
     const { username, password, displayName, grade = 2 } = json ?? {};
-    if (!USERNAME.test(username ?? '')) throw new HttpError(400, 'Username must be 3-24 letters, numbers, . _ or -');
     if (typeof password !== 'string' || password.length < 6) throw new HttpError(400, 'Password must be at least 6 characters');
-    const lower = username.toLowerCase();
-    if (players.find((p) => p.username === lower)) throw new HttpError(409, 'Username taken');
-    const player = players.insert({
-      username: lower,
-      displayName: String(displayName || username).slice(0, 32),
-      passwordHash: hashPassword(password),
-      grade: Math.max(0, Math.min(8, Number(grade) || 0)),
-      coins: config.startingCoins,
-      xp: 0,
-      level: 1,
-      streak: 0,
-      stats: { answered: 0, correct: 0 },
-      inventory: [],
-      avatar: {},
-      progress: {},
-      createdAt: new Date().toISOString(),
-    });
+    const player = createPlayer(store, config, { username, password, displayName, grade });
     return { status: 201, json: { token: issueSession(store, player.id), player: publicPlayer(player) } };
   });
 
   add('POST', '/auth/login', ({ json }) => {
-    const { username, password } = json ?? {};
-    const player = players.find((p) => p.username === String(username ?? '').toLowerCase());
-    if (!player || !verifyPassword(String(password ?? ''), player.passwordHash)) {
-      throw new HttpError(401, 'Wrong username or password');
-    }
+    const player = findPlayerByLogin(store, json?.username, json?.password);
+    if (!player) throw new HttpError(401, 'Wrong username or password');
     return { token: issueSession(store, player.id), player: publicPlayer(player) };
   });
 
